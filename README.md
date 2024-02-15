@@ -7,6 +7,8 @@ The program pulls sgf files from the "badukmovies-pro-collection" folder, and st
 
 The program keeps track of which game it showed last, so if you turn it off and on again then it will start with the next game in the folder, after the one it most recently opened.
 
-The folder has enough sgf files in it for about a year of continuous runtime, I think. But there's currently a bug where the program will begin to slow after a few days, and eventually stop. I'm running this at-startup on a raspberry pi, though, so my resources are very limited. Restarting the pi fixes the issue for me. Eventually I'll figure that out and fix it.
+The folder has just a few sgf files in it, because of some upload limitations I'm too lazy to manage.
+
+You can download the whole thing here: https://www.badukmovies.com/pro%5fgames . That has enough sgf files in it for about a year of continuous runtime, I think. But there's currently a bug where the program will begin to slow after a few days, and eventually stop. I'm running this at-startup on a raspberry pi, though, so my resources are very limited. Restarting the pi fixes the issue for me. Eventually I'll figure that out and fix it.
 
 This program must be placed in the same directory as the "badukmovies-pro-collection" folder in order to work.
