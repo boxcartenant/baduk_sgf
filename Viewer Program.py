@@ -1,5 +1,6 @@
 from tkinter import Tk, Canvas, Frame, BOTH, W
 from tkinter import *
+from tkinter.font import Font
 import os
 import time
 
@@ -39,17 +40,36 @@ basePath = os.sys.path[0] + "\\badukmovies-pro-collection"
 #subsequent scans, search through to recorded path, then proceed and grab next
 #if user requests special path, replace current path with special path
 
-currentPath = "" #stores the full path to the file, not including the file name
-currentFile = "" #stores the full path to the file, including the file name
-lastFound = True  #is the current path in search the most recently opened path?
+#currentPath #stores the full path to the file, not including the file name
+#currentFile #stores the full path to the file, including the file name
+#lastFound   #is the current path in search the most recently opened path?
+
+#try reading the last opened game, so we can pick up where we left off.
+#if the cache file doesn't exist, leave it blank and we'll create it later.
+try:
+    with open(basePath + "\\Last_Game.txt", 'r') as file:
+        currentFile = file.read()
+        currentPath = ""
+        for j in currentFile.split("\\")[:-1]:
+            currentPath += j + "\\"
+        currentPath = currentPath[:-1]
+        lastFound = False
+        file.close()
+except:
+    currentPath = "" 
+    currentFile = "" 
+    lastFound = True  
+
 
 def browsepath(startpath):
     global currentPath
     global currentFile
     global lastFound
+    global basePath
     #print("-----------------")
     #print(str(lastFound) + ": current path: " + currentPath)
-    
+
+    #walk through files until you find the one which was most recently opened. Then open the next one.    
     for root, dirs, files in os.walk(startpath):
         for name in files:
             if lastFound: #runs immediately the first time, and subsequently after finding the current path
@@ -58,6 +78,9 @@ def browsepath(startpath):
                     currentFile = currentPath + "\\" + str(name)
                     lastFound = False
                     print("opening: " + currentFile)
+                    with open(basePath + "\\Last_Game.txt", 'w') as file:
+                        file.write(currentFile)
+                        file.close()
                     #print("-----------------")
                     return
             else:
@@ -315,8 +338,12 @@ def interpretNodes():
 stoneMatrix = [] #contains graphic (circles) for the stones
 goLinesH = [] #contains the horizontal lines of the go board
 goLinesV = [] #contains the vertical lines of the go board
-winnerStone = None
+winnerStone = None #winner stuff is for showing who won the last game
 winnerLabel = None
+winnerColor = None
+winnerStones = []
+winnerLinesH = []
+winnerLinesV = []
 
 def initUI():#put together all the graphical objects. at end of initUI, call resetUI and nextGame
     global stoneMatrix
@@ -324,9 +351,11 @@ def initUI():#put together all the graphical objects. at end of initUI, call res
     global goLinesV
     global winnerStone
     global winnerLabel
+    global winnerStones, winnerLinesH, winnerLinesV
     global canvas
-    global smallDim
+    global smallDim, bigDim
     global goboard
+    global myFont, fontHeight
     windowgap = 50
     linegap = (smallDim - (windowgap*2)) / 18
     stonesize = linegap - 2
@@ -348,20 +377,41 @@ def initUI():#put together all the graphical objects. at end of initUI, call res
             y1 = windowgap + ((linegap) * col) - (stonesize/2)
             stoneMatrix[row].append(canvas.create_oval(x1,y1,x1+stonesize,y1+stonesize,fill = "white",outline="gray",width=1,state='hidden')) #'normal' when shown
 
+    linegap = (bigDim - smallDim - (windowgap*2)) / 18
+    stonesize = linegap - 2
+    #draw the recap board, for showing the winner of the last game
+    for row in range(len(goboard)):
+        winnerStones.append([])
+        x1 = (linegap * row) + windowgap
+        y1 = windowgap
+        x2 = (linegap * row) + windowgap
+        y2 = bigDim - smallDim - windowgap
+        winnerLinesH.append(canvas.create_line(smallDim+y1,50+x1,smallDim+y2,50+x2, fill="black"))
+        winnerLinesV.append(canvas.create_line(smallDim+x1,50+y1,smallDim+x2,50+y2, fill="black"))
+    #draw the stones, but leave them hidden. We'll show them when they're placed.
+    for row in range(len(goboard)):
+        for col in range(len(goboard[row])):
+            goboard[row][col] = 0
+            x1 = windowgap + smallDim + ((linegap) * row) - (stonesize/2)
+            y1 = windowgap + 50 + ((linegap) * col) - (stonesize/2)
 
-    winnerStone = canvas.create_oval(25, smallDim+30, 25, smallDim+40, fill = "white",outline="gray",width=1,state='hidden')
-    winnerLabel = canvas.create_text(25, smallDim+40, anchor=W, font="Purisa", text="")
+            winnerStones[row].append(canvas.create_oval(x1,y1,x1+stonesize,y1+stonesize,fill = "white",outline="gray",width=1,state='hidden')) #'normal' when shown
+            
+
+    winPos = smallDim+25
+    winnerStone = canvas.create_oval(winPos, 30, winPos+fontHeight, 30+fontHeight, fill = "white",outline="gray",width=1,state='hidden')
+    winnerLabel = canvas.create_text(winPos+fontHeight+5, 30, anchor=NW, font=myFont, text="")
     canvas.pack(fill=BOTH, expand=1)
 
 def resetUI():#hide stuff as if it's the start of a new game
     global winnerLabel
     global stoneMatrix
-    global winnerStone
+    global winnerStone, winnerStones
+    global winnerColor
     global canvas
     global goboard
-    #hide all stones on the board, and hide the winner label
-    canvas.itemconfigure(winnerLabel, text="")
-    canvas.itemconfigure(winnerStone, state='hidden')
+        
+    #hide all stones on the board.
     for row in range(len(goboard)):
         for col in range(len(goboard[row])):
             #print("old: " + str(goboard[row][col]))
@@ -455,17 +505,33 @@ def showWinner():
     #               ;RE[]       "
     #               ;RE[?]      unknown result
     global gameResult
-    global stoneMatrix
+    global stoneMatrix, winnerStones, winnerLabel, winnerStone
     global canvas
     global window
-    resetUI()
+    global winnerColor
+    goboard2 = [row[:] for row in goboard]#make a copy of the board from the previous game
+    resetUI()#this resets the main board
     GR = gameResult[0]
     print("game result: " + str(gameResult))
     drawResults = ["0","jigo", "draw"]
     badResults = ["Void","","?"]
     unknownResult = [(7,4),(8,3),(9,3),(10,3),(11,4),(11,5),(11,6),(10,7),(9,8),(9,9),(9,10),(9,11),(9,14)]
+    wintype = ""
+    if len(GR) > 2 and GR[1] == '+':
+        print(GR)
+        if GR[2].lower() == 'r':
+            wintype = " by resignation"
+        elif GR[2].lower() == 't':
+            wintype = " by timeout"
+        elif GR[2].lower == 'f':
+            wintype = " by forfeit"
+        elif GR[2:].replace('.','').isdigit():
+            wintype = " by " + GR[2:] + " points"
     #if the game was a draw, fill the board with half black half white
     if (GR.lower() in drawResults):
+        winnerColor = 'draw'
+        canvas.itemconfigure(winnerLabel, text="Previous game was a draw!")
+        canvas.itemconfigure(winnerStone, fill='gray', state='normal')
         for row in range(19):
             if row < 9:
                 for stone in stoneMatrix[row]:
@@ -476,16 +542,25 @@ def showWinner():
                     canvas.itemconfigure(stone, state='normal')
                     canvas.itemconfigure(stone, fill = "white")
     elif GR[0:2] == "B+":
+        winnerColor = 'black'
+        canvas.itemconfigure(winnerLabel, text="Previous game: Black wins" + wintype + "!")
+        canvas.itemconfigure(winnerStone, fill='black', state='normal')
         for x in range(6,13):
             for y in range(6,13):
                 canvas.itemconfigure(stoneMatrix[x][y], state='normal')
                 canvas.itemconfigure(stoneMatrix[x][y], fill = "black")
     elif GR[0:2] == "W+":
+        winnerColor = 'white'
+        canvas.itemconfigure(winnerLabel, text="Previous game: White wins"  + wintype + "!")
+        canvas.itemconfigure(winnerStone, fill='white', state='normal')
         for x in range(6,13):
             for y in range(6,13):
                 canvas.itemconfigure(stoneMatrix[x][y], state='normal')
                 canvas.itemconfigure(stoneMatrix[x][y], fill = "white")
     else:
+        winnerColor = 'unknown'
+        canvas.itemconfigure(winnerLabel, text="Previous game winner unknown.")
+        canvas.itemconfigure(winnerStone, fill='gray', state='normal')
         toggle = False
         for p in unknownResult:
             if toggle:
@@ -495,6 +570,15 @@ def showWinner():
                 canvas.itemconfigure(stoneMatrix[p[0]][p[1]], state='normal')
                 canvas.itemconfigure(stoneMatrix[p[0]][p[1]], fill = "white")
             toggle = not toggle
+    #show the board from the previous game
+    for row in range(len(goboard)):
+        for col in range(len(goboard[row])):
+            if goboard2[row][col] == -1: #white
+                canvas.itemconfigure(winnerStones[row][col], state='normal', fill='white')
+            if goboard2[row][col] == 1: #black
+                canvas.itemconfigure(winnerStones[row][col], state='normal', fill='black')
+            if goboard2[row][col] == 0: #empty
+                canvas.itemconfigure(winnerStones[row][col], state='hidden')
     window.update_idletasks()
     window.update()
     time.sleep(3)
@@ -534,7 +618,7 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
     bx = -1
     by = -1
     #print ("i="+str(i))
-    nodetime = 1
+    nodetime = 1#short wait to start the game
     if i < len(nodes):
         node = nodes[i]
         if all(item in node[1] for item in mainbranch):
@@ -584,12 +668,12 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
                 #print("node action")
                 window.update_idletasks()
                 window.update()
-                nodetime = 3000
+                nodetime = 30 #longer wait between moves in a game
             #print("waiting for " + str(nodetime))
             window.after(nodetime, lambda: gameLoop(i+1))
     else:
         #print("gameDone")
-        time.sleep(3)
+        time.sleep(3000)#pause between games
         showWinner()
         gameDone = True
         
@@ -601,11 +685,14 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
 window = Tk()
 canvasW = window.winfo_screenwidth() * 4 / 5
 canvasH = window.winfo_screenheight() * 4 / 5
+smallDim = 600
+bigDim = 1000
 if canvasW < canvasH:
-    canvasH = canvasW
+    smallDim = canvasW
+    bigDim = canvasH
 else:
-    canvasW = canvasH
-smallDim = canvasH
+    smallDim = canvasH
+    bigDim = canvasW
 canvas = Canvas(window, width=canvasW, height=canvasH, bg="blanched almond")
 
 windowPosX = 0
@@ -615,6 +702,8 @@ window.title("Isaac's Baduk Viewer")
 
 window.geometry('%dx%d+%d+%d' % (canvasW, canvasH, windowPosX, windowPosY))
 canvas.pack(fill=BOTH, expand=1)
+myFont = Font()
+fontHeight = Font.metrics(myFont)["linespace"]
 
 
 def doAllTheStuff():
@@ -627,7 +716,7 @@ def doAllTheStuff():
         #print("nextGame")
         nextGame()#get all the stuff for the next game
         #print("gameLoop")
-        gameLoop(0)#the game sequence, show all that stuff. at end of game sequence, call resetUI and nextGame
+        gameLoop(0)#the game sequence, show all that stuff. at end of game sequence, calls resetUI again and nextGame
     window.update_idletasks()
     window.update()
     window.after(5000, lambda: doAllTheStuff())#check every 5 seconds for a new game
