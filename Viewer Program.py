@@ -77,7 +77,7 @@ def browsepath(startpath):
                     currentPath = str(root)
                     currentFile = currentPath + "\\" + str(name)
                     lastFound = False
-                    print("opening: " + currentFile)
+                    #print("opening: " + currentFile)
                     with open(basePath + "\\Last_Game.txt", 'w') as file:
                         file.write(currentFile)
                         file.close()
@@ -512,13 +512,13 @@ def showWinner():
     goboard2 = [row[:] for row in goboard]#make a copy of the board from the previous game
     resetUI()#this resets the main board
     GR = gameResult[0]
-    print("game result: " + str(gameResult))
+    #print("game result: " + str(gameResult))
     drawResults = ["0","jigo", "draw"]
     badResults = ["Void","","?"]
     unknownResult = [(7,4),(8,3),(9,3),(10,3),(11,4),(11,5),(11,6),(10,7),(9,8),(9,9),(9,10),(9,11),(9,14)]
     wintype = ""
     if len(GR) > 2 and GR[1] == '+':
-        print(GR)
+        #print(GR)
         if GR[2].lower() == 'r':
             wintype = " by resignation"
         elif GR[2].lower() == 't':
