@@ -4,6 +4,10 @@ from tkinter.font import Font
 import os
 import time
 
+gameSpeed = 5000 #time between moves, ms (must be longer than highlightTime)
+sleepTime = 3 #time between games, during which the program is unresponsive (sleeping), s
+highlightTime = 1500 #duration to show the red rectangle for highlighting the last stone (must be shorter than gameSpeed)
+
 #coordinate letters. In some sgf files, [tt] is used for "pass". Since we aren't annotating the game, we can just ignore those.
 Q = {'a':0,'b':1,'c':2,'d':3,'e':4,'f':5,'g':6,'h':7,'i':8,'j':9,'k':10,'l':11,'m':12,'n':13,'o':14,'p':15,'q':16,'r':17,'s':18}#,'t':19}
 goboard   = [
@@ -77,7 +81,7 @@ def browsepath(startpath):
                     currentPath = str(root)
                     currentFile = currentPath + "\\" + str(name)
                     lastFound = False
-                    #print("opening: " + currentFile)
+                    print("opening: " + currentFile)
                     with open(basePath + "\\Last_Game.txt", 'w') as file:
                         file.write(currentFile)
                         file.close()
@@ -341,12 +345,13 @@ goLinesV = [] #contains the vertical lines of the go board
 winnerStone = None #winner stuff is for showing who won the last game
 winnerLabel = None
 winnerColor = None
+highlight_rect = None
 winnerStones = []
 winnerLinesH = []
 winnerLinesV = []
 
 def initUI():#put together all the graphical objects. at end of initUI, call resetUI and nextGame
-    global stoneMatrix
+    global stoneMatrix, highlight_rect
     global goLinesH
     global goLinesV
     global winnerStone
@@ -377,6 +382,9 @@ def initUI():#put together all the graphical objects. at end of initUI, call res
             y1 = windowgap + ((linegap) * col) - (stonesize/2)
             stoneMatrix[row].append(canvas.create_oval(x1,y1,x1+stonesize,y1+stonesize,fill = "white",outline="gray",width=1,state='hidden')) #'normal' when shown
 
+    #make the rectangle that will go around newly placed stones
+    highlight_rect = canvas.create_rectangle(-10, -10, -10, -10, outline='red', width=10, state = 'hidden')  # Initial position and size off-screen
+    
     linegap = (bigDim - smallDim - (windowgap*2)) / 18
     stonesize = linegap - 2
     #draw the recap board, for showing the winner of the last game
@@ -454,7 +462,7 @@ def checkGroup(x0,y0,target):
     checked = []
     toCheck = [(x0,y0)]
     
-    def cp(x,y):#cp for check point.
+    def cp(x,y):#cp stands for check point.
         #Checks a single stone.
         #Returns 1 if stone is an open space.
         #if stone is the same color as the group, adds it to appropriate lists
@@ -475,6 +483,7 @@ def checkGroup(x0,y0,target):
 
     while len(toCheck) > 0:
         #print("stones to check: " + str(len(toCheck)))
+        #check the first stone in the list over and over, because we're removing it each time.
         x = toCheck[0][0]
         y = toCheck[0][1]
         #print("current stone: " + str(x) + "," + str(y))
@@ -507,18 +516,18 @@ def showWinner():
     global gameResult
     global stoneMatrix, winnerStones, winnerLabel, winnerStone
     global canvas
-    global window
+    global window, sleepTime
     global winnerColor
     goboard2 = [row[:] for row in goboard]#make a copy of the board from the previous game
     resetUI()#this resets the main board
     GR = gameResult[0]
-    #print("game result: " + str(gameResult))
+    print("game result: " + str(gameResult))
     drawResults = ["0","jigo", "draw"]
     badResults = ["Void","","?"]
     unknownResult = [(7,4),(8,3),(9,3),(10,3),(11,4),(11,5),(11,6),(10,7),(9,8),(9,9),(9,10),(9,11),(9,14)]
     wintype = ""
     if len(GR) > 2 and GR[1] == '+':
-        #print(GR)
+        print(GR)
         if GR[2].lower() == 'r':
             wintype = " by resignation"
         elif GR[2].lower() == 't':
@@ -581,8 +590,25 @@ def showWinner():
                 canvas.itemconfigure(winnerStones[row][col], state='hidden')
     window.update_idletasks()
     window.update()
-    time.sleep(3)
+    time.sleep(sleepTime)
         
+
+def highlight_last_stone(row, col):
+    global smallDim, bigDim
+    windowgap = 50
+    linegap = (smallDim - (windowgap*2)) / 18
+    stonesize = linegap - 2
+
+    x1 = windowgap + ((linegap) * row) - (stonesize/2) - 5  # Adjusted for red outline
+    y1 = windowgap + ((linegap) * col) - (stonesize/2) - 5  # Adjusted for red outline
+    x2 = x1 + stonesize + 10  # Adjusted for red outline
+    y2 = y1 + stonesize + 10  # Adjusted for red outline
+    
+    canvas.coords(highlight_rect, x1, y1, x2, y2)  # Move the rectangle to the new position
+    canvas.itemconfigure(highlight_rect, state='normal')  # Show the rectangle
+    
+    canvas.after(highlightTime, lambda: canvas.itemconfigure(highlight_rect, state='hidden'))  # Hide after 3000ms (3 seconds)
+
 
 #"nodes" is a list of tuples: (a,b), where a is a list of propertyies, and b is a list of applicable branch numbers.
 #properties are: (c,d), where c is the property identity string, and d is a list of property values
@@ -610,7 +636,7 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
     global canvas
     global window
     global gameDone
-    
+    global gameSpeed, sleepTime
     #properties are in node[0]
     #branchstack is in node[1]
     #print ("Number of nodes: " + str(len(nodes)))
@@ -618,7 +644,6 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
     bx = -1
     by = -1
     #print ("i="+str(i))
-    nodetime = 1#short wait to start the game
     if i < len(nodes):
         node = nodes[i]
         if all(item in node[1] for item in mainbranch):
@@ -650,10 +675,12 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
                                 #print("placing black stone at " + str(bx) + "," + str(by))
                                 canvas.itemconfigure(stoneMatrix[bx][by], state='normal')
                                 canvas.itemconfigure(stoneMatrix[bx][by], fill = "black")
+                                highlight_last_stone(bx, by)
                             if target == -1:
                                 #print("placing white stone at " + str(bx) + "," + str(by))
                                 canvas.itemconfigure(stoneMatrix[bx][by], state='normal')
                                 canvas.itemconfigure(stoneMatrix[bx][by], fill = "white")
+                                highlight_last_stone(bx, by)
                             if target == 0:
                                 #print("removing stone at " + str(bx) + "," + str(by))
                                 canvas.itemconfigure(stoneMatrix[bx][by], state='hidden')
@@ -668,12 +695,11 @@ def gameLoop(i):#the game sequence, show all that stuff. at end of game sequence
                 #print("node action")
                 window.update_idletasks()
                 window.update()
-                nodetime = 30 #longer wait between moves in a game
             #print("waiting for " + str(nodetime))
-            window.after(nodetime, lambda: gameLoop(i+1))
+            window.after(gameSpeed, lambda: gameLoop(i+1))
     else:
         #print("gameDone")
-        time.sleep(3000)#pause between games
+        time.sleep(sleepTime)#pause between games
         showWinner()
         gameDone = True
         
