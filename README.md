@@ -5,6 +5,8 @@ I wrote this program to passively familiarize my son with baduk patterns in pro 
 
 The program pulls sgf files from the "badukmovies-pro-collection" folder, and steps through all the stone-placements in each game one-by-one, with a few seconds between each move. At the end of each game, it shows a block of white stones or black stones to indicate the winner (as dictated by the sgf file), and it shows the results of the last game. If no winner is indicated in the sgf, or it's a draw, it shows a block of half-black, half-white, and indicates that the winner is unknown or a draw.
 
+![image info](Screenshots/Screenshot1.png)
+
 The program keeps track of which game it showed last, so if you turn it off and on again then it will start with the next game in the folder, after the one it most recently opened.
 
 The folder has just a few sgf files in it, but you can get like a year's worth of runtime by downloading the full collection from here: https://www.badukmovies.com/pro%5fgames .
