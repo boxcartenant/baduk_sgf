@@ -13,6 +13,6 @@ The folder has just a few sgf files in it, but you can get like a year's worth o
 
 The program walks the folders and parses for .sgf files, so you don't have to modify the folder structure that you get by downloading from badukmovies.
 
-Running on my raspberry pi, there's currently a bug where the program will begin to slow after a few days, and eventually stop. It's not a big deal for my use-case, but eventually I'll figure that out and fix it.
+As of the last version, running on my raspberry pi, the program can now stay active for 2-3 months before needing to be reset. (I was going to update this after a few days if it worked well, but I forgot). I'll pull the latest from the pi later and post it here just to make sure that what's on github is what's actually working for me.
 
 This program must be placed in the same directory as the "badukmovies-pro-collection" folder in order to work.
